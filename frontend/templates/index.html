@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Resume Builder - Harvard Template</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            padding: 40px;
+        }
+
+        .upload-section {
+            background: #f8fafc;
+            border-radius: 15px;
+            padding: 30px;
+            border: 2px dashed #cbd5e1;
+            transition: all 0.3s ease;
+        }
+
+        .upload-section:hover {
+            border-color: #4f46e5;
+            background: #f1f5f9;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-input:hover {
+            border-color: #4f46e5;
+        }
+
+        .textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            resize: vertical;
+            min-height: 120px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+        }
+
+        .textarea:focus, .file-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .checkbox-group {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            transform: scale(1.2);
+            accent-color: #4f46e5;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results-section {
+            background: #f8fafc;
+            border-radius: 15px;
+            padding: 30px;
+        }
+
+        .results-section h3 {
+            color: #374151;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+
+        .ats-score {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .score-bar {
+            width: 100%;
+            height: 20px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .score-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444 0%, #f59e0b 50%, #10b981 100%);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+
+        .download-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .download-btn {
+            padding: 12px 20px;
+            background: #10b981;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .download-btn:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #fecaca;
+            margin: 15px 0;
+        }
+
+        .success {
+            background: #f0fdf4;
+            color: #16a34a;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #bbf7d0;
+            margin: 15px 0;
+        }
+
+        .recommendations {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .recommendations h4 {
+            margin-bottom: 10px;
+            color: #374151;
+        }
+
+        .recommendations ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+
+        .recommendations li {
+            padding: 5px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .recommendations li:before {
+            content: "•";
+            color: #4f46e5;
+            margin-right: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .checkbox-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 AI Resume Builder</h1>
+            <p>Create professional Harvard Business School formatted resumes with AI optimization</p>
+        </div>
+
+        <div class="main-content">
+            <div class="upload-section">
+                <form id="resumeForm" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="resume_file">📄 Upload Resume (PDF, DOCX, TXT, Image)</label>
+                        <input type="file" id="resume_file" name="resume_file" class="file-input"
+                               accept=".pdf,.docx,.txt,.png,.jpg,.jpeg" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="job_description">💼 Job Description</label>
+                        <textarea id="job_description" name="job_description" class="textarea"
+                                  placeholder="Paste the job description here to optimize your resume for this specific role..."
+                                  required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="company_name">🏢 Company Name (Optional)</label>
+                        <input type="text" id="company_name" name="company_name" class="input-field"
+                               placeholder="e.g., Google, Microsoft, Amazon">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="position_title">💻 Position Title (Optional)</label>
+                        <input type="text" id="position_title" name="position_title" class="input-field"
+                               placeholder="e.g., Senior Software Engineer, Product Manager">
+                    </div>
+
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="generate_cover_letter" name="generate_cover_letter">
+                            <label for="generate_cover_letter">📝 Generate Cover Letter</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="generate_interview_questions" name="generate_interview_questions">
+                            <label for="generate_interview_questions">❓ Generate Interview Questions</label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="submitBtn">
+                        🚀 Build My Harvard Resume
+                    </button>
+                </form>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Processing your resume with AI...</p>
+                </div>
+            </div>
+
+            <div class="results-section" id="results">
+                <h3>📊 Results</h3>
+                <p style="color: #6b7280; text-align: center; padding: 40px;">
+                    Upload your resume and job description to see ATS scores and download your Harvard-formatted resume.
+                </p>
+
+                <div id="ats-results" style="display: none;">
+                    <div class="ats-score">
+                        <h4>ATS Score</h4>
+                        <div class="score-bar">
+                            <div class="score-fill" id="scoreFill" style="width: 0%"></div>
+                        </div>
+                        <p id="scoreText">0%</p>
+                    </div>
+
+                    <div class="recommendations" id="recommendationsSection" style="display: none;">
+                        <h4>📋 Recommendations</h4>
+                        <ul id="recommendationsList"></ul>
+                    </div>
+                </div>
+
+                <div class="download-buttons" id="downloadSection" style="display: none;">
+                    <a href="#" class="download-btn" id="downloadResume">
+                        📄 Download Harvard Resume (.docx)
+                    </a>
+                    <a href="#" class="download-btn" id="downloadResumeHTML">
+                        🌐 Download HTML Resume (.html)
+                    </a>
+                    <a href="#" class="download-btn" id="downloadCoverLetter" style="display: none;">
+                        📝 Download Cover Letter (.txt)
+                    </a>
+                    <a href="#" class="download-btn" id="downloadInterviewQuestions" style="display: none;">
+                        ❓ Download Interview Questions (.txt)
+                    </a>
+                </div>
+
+                <div id="errorMessage"></div>
+                <div id="successMessage"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('resumeForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const form = document.getElementById('resumeForm');
+            const results = document.getElementById('results');
+            const errorDiv = document.getElementById('errorMessage');
+            const successDiv = document.getElementById('successMessage');
+
+            // Clear previous messages
+            errorDiv.innerHTML = '';
+            successDiv.innerHTML = '';
+
+            // Show loading state
+            submitBtn.disabled = true;
+            loading.style.display = 'block';
+            form.style.display = 'none';
+
+            try {
+                const formData = new FormData(e.target);
+
+                const response = await fetch('/api/process-resume', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Show success message
+                    successDiv.innerHTML = '<div class="success">✅ Resume processed successfully!</div>';
+
+                    // Update ATS score
+                    const atsResults = document.getElementById('ats-results');
+                    const scoreFill = document.getElementById('scoreFill');
+                    const scoreText = document.getElementById('scoreText');
+
+                    atsResults.style.display = 'block';
+                    scoreFill.style.width = result.ats_score + '%';
+                    scoreText.textContent = result.ats_score + '%';
+
+                    // Show recommendations
+                    if (result.ats_recommendations && result.ats_recommendations.length > 0) {
+                        const recommendationsSection = document.getElementById('recommendationsSection');
+                        const recommendationsList = document.getElementById('recommendationsList');
+
+                        recommendationsSection.style.display = 'block';
+                        recommendationsList.innerHTML = '';
+
+                        result.ats_recommendations.forEach(rec => {
+                            const li = document.createElement('li');
+                            li.textContent = rec;
+                            recommendationsList.appendChild(li);
+                        });
+                    }
+
+                    // Setup download links
+                    const downloadSection = document.getElementById('downloadSection');
+                    const downloadResume = document.getElementById('downloadResume');
+                    const downloadResumeHTML = document.getElementById('downloadResumeHTML');
+                    const downloadCoverLetter = document.getElementById('downloadCoverLetter');
+                    const downloadInterviewQuestions = document.getElementById('downloadInterviewQuestions');
+
+                    downloadSection.style.display = 'block';
+                    downloadResume.href = `/api/download/resume?file_path=${encodeURIComponent(result.resume_file_path)}`;
+                    downloadResumeHTML.href = `/api/download/resume_html?file_path=${encodeURIComponent(result.resume_html_path)}`;
+
+                    if (result.cover_letter_path) {
+                        downloadCoverLetter.style.display = 'block';
+                        downloadCoverLetter.href = `/api/download/cover_letter?file_path=${encodeURIComponent(result.cover_letter_path)}`;
+                    }
+
+                    if (result.interview_questions_path) {
+                        downloadInterviewQuestions.style.display = 'block';
+                        downloadInterviewQuestions.href = `/api/download/interview_questions?file_path=${encodeURIComponent(result.interview_questions_path)}`;
+                    }
+
+                } else {
+                    errorDiv.innerHTML = `<div class="error">❌ Error: ${result.error}</div>`;
+                }
+
+            } catch (error) {
+                errorDiv.innerHTML = `<div class="error">❌ Network error: ${error.message}</div>`;
+            } finally {
+                // Hide loading state
+                loading.style.display = 'none';
+                form.style.display = 'block';
+                submitBtn.disabled = false;
+            }
+        });
+
+        // File input styling
+        document.getElementById('resume_file').addEventListener('change', function(e) {
+            const fileName = e.target.files[0]?.name || 'Choose file...';
+            e.target.style.color = e.target.files[0] ? '#374151' : '#6b7280';
+        });
+    </script>
+</body>
+</html>

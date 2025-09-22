@@ -1,0 +1,21 @@
+{
+  "font": "Times New Roman",
+  "font_size": 12,
+  "margins": {"top": 1.0, "bottom": 1.0, "left": 0.5, "right": 0.5},
+  "section_order": [
+    "contact_info",
+    "summary",
+    "education",
+    "experience",
+    "projects",
+    "certifications",
+    "skills",
+    "languages"
+  ],
+  "section_titles": {
+    "summary": "CAREER OBJECTIVE",
+    "certifications": "CERTIFICATES"
+  }
+}
+
+
