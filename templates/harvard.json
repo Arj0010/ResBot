@@ -1,6 +1,7 @@
 {
-  "font": "Times New Roman",
-  "font_size": 12,
+  "font": "Calibri",
+  "font_size": 10,
+  "name_font_size": 12,
   "margins": {"top": 1.0, "bottom": 1.0, "left": 0.5, "right": 0.5},
   "section_order": [
     "contact_info",
@@ -15,6 +16,12 @@
   "section_titles": {
     "summary": "CAREER OBJECTIVE",
     "certifications": "CERTIFICATES"
+  },
+  "formatting": {
+    "line_spacing": 1.0,
+    "space_after": 3,
+    "one_page_compliance": true,
+    "include_hyperlinks": true
   }
 }
 

@@ -65,8 +65,11 @@ async def parse_resume_api(file: UploadFile = File(...)):
 
 @app.post("/rewrite")
 async def rewrite_endpoint(body: RewriteRequest):
+    print(f"DEBUG API: Received rewrite request")
+    print(f"DEBUG API: Input keys: {list(body.resume_json.keys())}")
     # Get the tailored resume with full schema
     tailored_resume = rewrite_resume(body.resume_json, body.job_description)
+    print(f"DEBUG API: Output keys: {list(tailored_resume.keys())}")
     return JSONResponse(content=tailored_resume)
 
 
@@ -139,5 +142,10 @@ async def interview_questions_endpoint(body: InterviewQuestionsRequest):
 @app.get("/")
 async def root():
     return {"status": "ok"}
+
+@app.get("/debug-test")
+async def debug_test():
+    print("DEBUG TEST ENDPOINT CALLED!")
+    return {"debug": "test endpoint works"}
 
 

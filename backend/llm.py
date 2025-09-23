@@ -94,41 +94,15 @@ def _get_model() -> Any:
 
 
 def rewrite_resume(resume_json: Dict[str, Any], job_description: str) -> Dict[str, Any]:
-    model = _get_model()
+    # Temporarily bypass LLM for testing - return original resume with proper structure
+    print("********** CLAUDE DEBUG: REWRITE_RESUME CALLED **********")
+    print(f"Input resume keys: {list(resume_json.keys())}")
 
-    # Create optimization prompt
-    prompt = f"""
-Original Resume JSON:
-{json.dumps(resume_json, indent=2)}
-
-Job Description:
-{job_description}
-
-{PROMPT_TEMPLATE}
-
-IMPORTANT: Return the COMPLETE resume JSON with the EXACT same structure as the input, but with optimizations applied.
-"""
-
-    try:
-        response = model.generate_content(prompt)
-        text = response.text or "{}"
-
-        # Clean the response to extract JSON
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0]
-
-        payload = json.loads(text)
-
-        # Validate and merge with original to ensure completeness
-        optimized_resume = validate_and_merge_resume(payload, resume_json)
-        return optimized_resume
-
-    except Exception as e:
-        print(f"LLM processing error: {e}")
-        # Return original data if optimization fails
-        return resume_json
+    # For now, just return the original resume to test the flow
+    result = resume_json.copy()
+    print(f"Returning result keys: {list(result.keys())}")
+    print("********** END CLAUDE DEBUG **********")
+    return result
 
 
 def validate_and_merge_resume(llm_output: Dict[str, Any], original_resume: Dict[str, Any]) -> Dict[str, Any]:
