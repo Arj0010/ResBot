@@ -8,8 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from .parser import parse_resume
-from .llm import rewrite_resume, generate_cover_letter, generate_interview_questions
+from backend.parser import extract_text
+from .llm import rewrite_resume, generate_cover_letter, generate_interview_questions,llm_parse_resume
 from .renderer import render_harvard
 from .html_renderer import render_html_resume
 from .ats import score_ats
@@ -50,17 +50,19 @@ class InterviewQuestionsRequest(BaseModel):
 
 
 @app.post("/parse")
-async def parse_endpoint(file: UploadFile = File(...)):
+async def parse_resume_api(file: UploadFile = File(...)):
+    # Save uploaded file temporarily
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        content = await file.read()
-        tmp.write(content)
+        contents = await file.read()
+        tmp.write(contents)
         tmp_path = tmp.name
+
     try:
-        data = parse_resume(tmp_path)
-        return JSONResponse(content=data)
+        raw_text = extract_text(tmp_path)
+        parsed = llm_parse_resume(raw_text)
+        return JSONResponse(content=parsed)
     finally:
         os.unlink(tmp_path)
-
 
 @app.post("/rewrite")
 async def rewrite_endpoint(body: RewriteRequest):

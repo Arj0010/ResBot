@@ -161,17 +161,14 @@ async def process_resume(
         temp_resume.close()
 
         # Generate HTML version
+        # Generate HTML preview
         try:
             response = requests.post(f"{API_BASE}/render-html", json=merged_data, timeout=30)
-            html_content = response.content
-            temp_html = tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode='wb')
-            temp_html.write(html_content)
-            temp_html.close()
+            html_preview = response.text
         except Exception as e:
             print(f"HTML generation failed: {e}")
-            temp_html = tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode='w', encoding='utf-8')
-            temp_html.write("<html><body><h1>HTML generation failed</h1></body></html>")
-            temp_html.close()
+            html_preview = "<html><body><h1>HTML generation failed</h1></body></html>"
+
 
         # Generate optional documents
         cover_letter_path = None
@@ -206,7 +203,7 @@ async def process_resume(
             "keyword_matches": ats_data.get("keyword_matches", {}),
             "score_breakdown": ats_data.get("score_breakdown", {}),
             "resume_file_path": temp_resume.name,
-            "resume_html_path": temp_html.name,
+            "resume_html_preview": html_preview,
             "cover_letter_path": cover_letter_path,
             "interview_questions_path": interview_questions_path
         }
@@ -243,12 +240,6 @@ async def download_file(file_type: str, file_path: str):
                 path=file_path,
                 filename="Interview_Questions.txt",
                 media_type="text/plain"
-            )
-        elif file_type == "resume_html":
-            return FileResponse(
-                path=file_path,
-                filename="Harvard_Resume.html",
-                media_type="text/html"
             )
         else:
             raise HTTPException(status_code=400, detail="Invalid file type")

@@ -390,13 +390,16 @@
                         <ul id="recommendationsList"></ul>
                     </div>
                 </div>
+                    <!-- Resume Preview goes here -->
+                <div id="resumePreview"
+                    style="margin:20px 0; border:1px solid #e5e7eb; border-radius:10px; padding:20px; background:white; display:none; max-height:600px; overflow:auto;">
+                </div>
+
 
                 <div class="download-buttons" id="downloadSection" style="display: none;">
                     <a href="#" class="download-btn" id="downloadResume">
                         📄 Download Harvard Resume (.docx)
                     </a>
-                    <a href="#" class="download-btn" id="downloadResumeHTML">
-                        🌐 Download HTML Resume (.html)
                     </a>
                     <a href="#" class="download-btn" id="downloadCoverLetter" style="display: none;">
                         📝 Download Cover Letter (.txt)
@@ -422,6 +425,7 @@
             const results = document.getElementById('results');
             const errorDiv = document.getElementById('errorMessage');
             const successDiv = document.getElementById('successMessage');
+            
 
             // Clear previous messages
             errorDiv.innerHTML = '';
@@ -473,13 +477,18 @@
                     // Setup download links
                     const downloadSection = document.getElementById('downloadSection');
                     const downloadResume = document.getElementById('downloadResume');
-                    const downloadResumeHTML = document.getElementById('downloadResumeHTML');
                     const downloadCoverLetter = document.getElementById('downloadCoverLetter');
                     const downloadInterviewQuestions = document.getElementById('downloadInterviewQuestions');
-
                     downloadSection.style.display = 'block';
                     downloadResume.href = `/api/download/resume?file_path=${encodeURIComponent(result.resume_file_path)}`;
-                    downloadResumeHTML.href = `/api/download/resume_html?file_path=${encodeURIComponent(result.resume_html_path)}`;
+
+                    // Show HTML preview instead of download
+                    if (result.resume_html_preview) {
+                        const previewDiv = document.getElementById('resumePreview').innerHTML = result.resume_html_preview;
+
+                        previewDiv.innerHTML = result.resume_html_preview;
+                        previewDiv.style.display = 'block';
+                    }
 
                     if (result.cover_letter_path) {
                         downloadCoverLetter.style.display = 'block';
