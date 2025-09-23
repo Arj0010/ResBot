@@ -1,4 +1,5 @@
 import json
+from pydoc import doc
 import re
 import os
 from typing import Dict, Any, List
@@ -9,6 +10,54 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+
+def _ensure_url(url: str) -> str:
+    if not url:
+        return url
+    u = url.strip()
+    if u.startswith("mailto:") or u.startswith("http://") or u.startswith("https://"):
+        return u
+    if u.startswith("www."):
+        return "https://" + u
+    return "https://" + u
+
+def _add_hyperlink(paragraph, url, text):
+    """Add a clickable hyperlink to a paragraph."""
+    url = _ensure_url(url)
+    part = paragraph.part
+    r_id = part.relate_to(url, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", is_external=True)
+
+    hyperlink = OxmlElement('w:hyperlink')
+    hyperlink.set(qn('r:id'), r_id)
+
+    new_run = OxmlElement('w:r')
+    rPr = OxmlElement('w:rPr')
+
+    # underline + blue color
+    u = OxmlElement('w:u'); u.set(qn('w:val'), 'single'); rPr.append(u)
+    color = OxmlElement('w:color'); color.set(qn('w:val'), "0000FF"); rPr.append(color)
+
+    new_run.append(rPr)
+    t = OxmlElement('w:t'); t.text = text
+    new_run.append(t)
+    hyperlink.append(new_run)
+    paragraph._element.append(hyperlink)
+    return hyperlink
+
+def _add_divider(doc):
+    p = doc.add_paragraph()
+    p_par = p._element
+    pPr = p_par.get_or_add_pPr()
+    p_borders = OxmlElement('w:pBdr')
+    bottom = OxmlElement('w:bottom')
+    bottom.set(qn('w:val'), 'single')
+    bottom.set(qn('w:sz'), '6')
+    bottom.set(qn('w:space'), '1')
+    bottom.set(qn('w:color'), '000000')
+    p_borders.append(bottom)
+    pPr.append(p_borders)
+    return p
 
 
 def _safe_text(text: str) -> str:
@@ -36,116 +85,188 @@ def _safe_add_paragraph(doc, text: str):
     return doc.add_paragraph("")
 
 
-def _add_hyperlink(paragraph, url: str, text: str):
-    # Create hyperlink w:r element
-    part = paragraph.part
-    r_id = part.relate_to(url, reltype="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink", is_external=True)
-    hyperlink = OxmlElement('w:hyperlink')
-    hyperlink.set(qn('r:id'), r_id)
 
-    new_run = OxmlElement('w:r')
-    r_pr = OxmlElement('w:rPr')
-    r_style = OxmlElement('w:rStyle')
-    r_style.set(qn('w:val'), 'Hyperlink')
-    r_pr.append(r_style)
-    new_run.append(r_pr)
+def render_harvard(resume_json, output_path: str, job_title: str = ""):
+    doc = Document()
 
-    t = OxmlElement('w:t')
-    t.text = _safe_text(text)
-    new_run.append(t)
-    hyperlink.append(new_run)
-    paragraph._p.append(hyperlink)
+    style = doc.styles['Normal']
+    style.font.name = 'Times New Roman'
+    style.font.size = Pt(11)
+
+    # tighten paragraph spacing globally for compact Harvard look
+    for pstyle in doc.styles:
+        try:
+            pstyle.paragraph_format.space_after = Pt(2)
+        except Exception:
+            pass
+    # --- Header: centered name + single contact line with clickable links ---
+    name = resume_json.get("contact_info", {}).get("full_name", "")
+    if name:
+        p = doc.add_paragraph()
+        p.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+        r = p.add_run(name)
+        r.bold = True
+        r.font.size = Pt(16)
+        p.paragraph_format.space_after = Pt(4)
+
+    # Build contact pieces
+    ci = resume_json.get("contact_info", {})
+    links = resume_json.get("links", {}) or {}
+
+    # create a centered paragraph and add text runs + hyperlinks
+    cp = doc.add_paragraph()
+    cp.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    parts = []
+    if ci.get("location"):
+        parts.append(("text", ci["location"]))
+    if ci.get("email"):
+        parts.append(("text", ci["email"]))
+    if ci.get("phone"):
+        parts.append(("text", ci["phone"]))
+
+    # Ordered preferred links
+    preferred = ["LinkedIn", "GitHub", "HuggingFace"]
+    link_items = []
+    for key in preferred:
+        if links.get(key):
+            link_items.append((key, links[key]))
+    # any other links
+    for k, v in links.items():
+        if k not in preferred and v:
+            link_items.append((k, v))
+
+    # Write items to paragraph
+    first = True
+    for t in parts:
+        if not first:
+            cp.add_run(" • ")
+        cp.add_run(t[1] if isinstance(t, tuple) else t)
+        first = False
+
+    for idx, (label, url) in enumerate(link_items):
+        if not first:
+            cp.add_run(" • ")
+        _add_hyperlink(cp, url, label)
+        first = False
+
+    cp.paragraph_format.space_after = Pt(6)
+    _add_divider(doc)
+
+    # === Summary ===
+    if resume_json.get("summary"):
+        _add_section_title(doc, "SUMMARY")
+        doc.add_paragraph(resume_json["summary"])
+        _add_divider(doc)
+
+    # === Education ===
+    if resume_json.get("education"):
+        _add_section_title(doc, "EDUCATION")
+        for edu in resume_json["education"]:
+            table = doc.add_table(rows=1, cols=2)
+            table.allow_autofit = True
+            left_cell, right_cell = table.rows[0].cells
+
+            # Left cell: Institution + location
+            p = left_cell.paragraphs[0]
+            run = p.add_run(edu.get("institution", ""))
+            run.bold = True
+            if edu.get("location"):
+                p.add_run(f" — {edu['location']}")
+
+            # Right cell: Graduation date
+            if edu.get("graduation_date"):
+                rp = right_cell.paragraphs[0]
+                rp.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
+                rp.add_run(edu["graduation_date"])
+
+            # Next line: Degree + field + GPA
+            degree_line = f"{edu.get('degree','')} in {edu.get('field','')}"
+            if edu.get("gpa"):
+                degree_line += f", GPA: {edu['gpa']}"
+            left_cell.add_paragraph(degree_line)
+
+        doc.add_paragraph()
+        _add_divider(doc)
+
+    # === Experience (table layout so dates align on right) ===
+    if resume_json.get("experience"):
+        _add_section_title(doc, "EXPERIENCE")
+        for exp in resume_json["experience"]:
+            table = doc.add_table(rows=1, cols=2)
+            table.allow_autofit = True
+            left_cell, right_cell = table.rows[0].cells
+
+            # Left: company (bold) + position (italic) + bullets
+            left_para = left_cell.paragraphs[0]
+            left_run = left_para.add_run(_safe_text(exp.get("company", "")))
+            left_run.bold = True
+
+            # position on next line
+            if exp.get("position"):
+                pos_p = left_cell.add_paragraph()
+                pos_run = pos_p.add_run(_safe_text(exp.get("position")))
+                pos_run.italic = True
+
+            # bullets
+            for b in exp.get("achievements", []):
+                bull_p = left_cell.add_paragraph()
+                bull_p.add_run(f"• {_safe_text(b)}")
+                bull_p.paragraph_format.space_after = Pt(1)
+
+            # Right: dates / location (top-right)
+            right_para = right_cell.paragraphs[0]
+            date_text = ""
+            if exp.get("start_date") or exp.get("end_date"):
+                date_text = f"{exp.get('start_date','')} – {exp.get('end_date','')}"
+            if exp.get("location"):
+                date_text = (date_text + " | " if date_text else "") + exp.get("location")
+            right_para.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
+            right_para.add_run(date_text)
+
+        # small space after section
+        doc.add_paragraph()
 
 
-def render_harvard(resume_json: Dict[str, Any], output_path: str, template_config_path: str) -> str:
-    """Generate DOCX resume with proper Harvard formatting"""
-    try:
-        doc = Document()
+    # === Projects ===
+    if resume_json.get("projects"):
+        _add_section_title(doc, "PROJECTS")
+        for proj in resume_json["projects"]:
+            p = doc.add_paragraph()
+            run = p.add_run(proj.get("title", ""))
+            run.bold = True
+            if proj.get("technologies"):
+                p.add_run(f" — {', '.join(proj['technologies'])}")
 
-        # Set proper Harvard margins and font
-        sections = doc.sections
-        for section in sections:
-            section.top_margin = Inches(1.0)
-            section.bottom_margin = Inches(1.0)
-            section.left_margin = Inches(0.5)
-            section.right_margin = Inches(0.5)
+            for b in proj.get("bullets", []):
+                doc.add_paragraph(f"• {b}")
+        _add_divider(doc)
 
-        # Style configuration - Calibri 9pt for 6-company one-page layout
-        style = doc.styles['Normal']
-        style.font.name = 'Calibri'
-        style.font.size = Pt(9)  # Reduced to 9pt for more space
-        # Ultra-compact line spacing for 6 companies
-        style.paragraph_format.line_spacing = 0.9
-        style.paragraph_format.space_after = Pt(1)
+    # === Skills & Interests ===
+    skills = resume_json.get("skills", {})
+    langs = resume_json.get("languages", [])
+    certs = resume_json.get("certifications", [])
 
-        # Header - Name (centered) - compact for 6 companies
-        contact = resume_json.get('contact_info', {})
-        name_para = doc.add_paragraph()
-        name_run = name_para.add_run(_safe_text(contact.get('full_name', 'NAME')))
-        name_run.font.size = Pt(12)  # Further reduced for space
-        name_run.font.bold = True
-        name_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        name_para.paragraph_format.space_after = Pt(1)  # Minimal spacing
+    if skills or langs or certs:
+        _add_section_title(doc, "SKILLS & INTERESTS")
 
-        # Contact line (centered)
-        contact_para = doc.add_paragraph()
-        contact_info = []
-        links = resume_json.get('links', {})
+        if skills:
+            for cat, items in skills.items():
+                doc.add_paragraph(f"{cat}: {', '.join(items)}")
 
-        if contact.get('email'):
-            contact_info.append(contact['email'])
-        if contact.get('phone'):
-            contact_info.append(contact['phone'])
-        if links.get('LinkedIn'):
-            contact_info.append('LinkedIn')
-        if links.get('GitHub'):
-            contact_info.append('GitHub')
-        if links.get('HuggingFace'):
-            contact_info.append('HuggingFace')
+        if langs:
+            doc.add_paragraph("Languages: " + ", ".join(langs))
 
-        contact_para.add_run(' • '.join(contact_info))
-        contact_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        contact_para.paragraph_format.space_after = Pt(3)  # Ultra-compact for 6 companies
+        if certs:
+            doc.add_paragraph("Certifications: " + ", ".join(certs))
 
-        # Career Objective
-        if resume_json.get('summary'):
-            _add_section_docx(doc, "CAREER OBJECTIVE", resume_json['summary'])
+    # Save DOCX
+    doc.save(output_path)
 
-        # Education
-        if resume_json.get('education'):
-            _add_education_section_docx(doc, resume_json['education'])
-
-        # Experience
-        if resume_json.get('experience'):
-            _add_experience_section_docx(doc, resume_json['experience'])
-
-        # Projects - only show if they exist in original resume, prioritize most relevant
-        projects = resume_json.get('projects', [])
-        if projects and len(projects) > 0:
-            # Show 1-2 projects based on available space and relevance
-            project_limit = 2 if len(projects) > 1 else 1
-            _add_projects_section_docx(doc, projects[:project_limit])
-
-        # Certificates
-        if resume_json.get('certifications'):
-            _add_certificates_section_docx(doc, resume_json['certifications'])
-
-        # Skills
-        if resume_json.get('skills'):
-            _add_skills_section_docx(doc, resume_json['skills'])
-
-        # Languages
-        if resume_json.get('languages'):
-            _add_languages_section_docx(doc, resume_json['languages'])
-
-        # Save document
-        doc.save(output_path)
-        return output_path
-
-    except Exception as e:
-        print(f"DOCX generation error: {e}")
-        return ""
-
+def _add_section_title(doc, title: str):
+    p = doc.add_paragraph()
+    run = p.add_run(title.upper())
+    run.bold = True
+    p.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
 
 def _add_section_docx(doc, title: str, content: str):
     """Add a section with title and content to DOCX"""
@@ -158,10 +279,8 @@ def _add_section_docx(doc, title: str, content: str):
     title_para.paragraph_format.space_after = Pt(0)
 
     # Divider line
-    divider_para = doc.add_paragraph()
-    divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(1)  # Ultra-compact
-
+    _add_divider(doc)
+    
     # Content
     content_para = doc.add_paragraph(_safe_text(content))
     content_para.paragraph_format.space_after = Pt(1)  # Ultra-compact
@@ -177,9 +296,7 @@ def _add_education_section_docx(doc, education_list):
     title_para.paragraph_format.space_before = Pt(6)  # Reduced from 12pt
 
     # Divider
-    divider_para = doc.add_paragraph()
-    divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(3)  # Reduced from 6pt
+    _add_divider(doc)
 
     # Education entries
     for edu in education_list:
@@ -220,9 +337,7 @@ def _add_experience_section_docx(doc, experience_list):
     title_para.paragraph_format.space_before = Pt(6)  # Reduced from 12pt
 
     # Divider
-    divider_para = doc.add_paragraph()
-    divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(3)  # Reduced from 6pt
+    _add_divider(doc)
 
     # Experience entries
     for exp in experience_list:
@@ -273,10 +388,8 @@ def _add_projects_section_docx(doc, projects_list):
     title_para.paragraph_format.space_before = Pt(6)  # Reduced from 12pt
 
     # Divider
-    divider_para = doc.add_paragraph()
-    divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(3)  # Reduced from 6pt
-
+    _add_divider(doc)
+ 
     # Project entries
     for project in projects_list:
         # Project title (bold)
@@ -311,9 +424,7 @@ def _add_certificates_section_docx(doc, certificates_list):
     title_para.paragraph_format.space_before = Pt(6)  # Reduced from 12pt
 
     # Divider
-    divider_para = doc.add_paragraph()
-    divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(3)  # Reduced from 6pt
+    _add_divider(doc)
 
     # Certificate entries - show all but in compact format
     for cert in certificates_list:
@@ -333,9 +444,7 @@ def _add_skills_section_docx(doc, skills_dict):
     title_para.paragraph_format.space_before = Pt(6)  # Reduced from 12pt
 
     # Divider
-    divider_para = doc.add_paragraph()
-    divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(3)  # Reduced from 6pt
+    _add_divider(doc)
 
     # Dynamic skill categories - process all categories in skills_dict
     for category, skills in skills_dict.items():
@@ -364,9 +473,7 @@ def _add_languages_section_docx(doc, languages_list):
     title_para.paragraph_format.space_before = Pt(6)  # Reduced from 12pt
 
     # Divider
-    divider_para = doc.add_paragraph()
-    divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(3)  # Reduced from 6pt
+    _add_divider(doc)
 
     # Languages
     lang_para = doc.add_paragraph()

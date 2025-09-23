@@ -8,25 +8,69 @@ def _tokenize(text: str) -> List[str]:
     return [t.lower() for t in re.findall(r"[A-Za-z0-9+#.]+", text)]
 
 
-def _flatten_resume(resume_json: Dict[str, Any]) -> str:
-    parts: List[str] = []
+def _flatten_resume(resume_json: dict) -> str:
+    """
+    Flatten nested resume JSON into a plain text string for keyword matching.
+    Ensures lists are joined into strings.
+    """
+    parts = []
+
+    # Contact info
     ci = resume_json.get("contact_info", {})
-    parts += [ci.get("full_name", ""), ci.get("location", "")]
-    parts += list((resume_json.get("links", {}) or {}).values())
+    parts.extend([ci.get("full_name", ""), ci.get("email", ""), ci.get("phone", ""), ci.get("location", "")])
+
+    # Links
+    links = resume_json.get("links", {})
+    parts.extend([str(v) for v in links.values() if v])
+
+    # Summary
     parts.append(resume_json.get("summary", ""))
+
+    # Education
     for edu in resume_json.get("education", []):
-        parts += [edu.get("institution", ""), edu.get("degree", ""), edu.get("field", ""), edu.get("gpa", "")]
+        parts.extend([
+            edu.get("institution", ""),
+            edu.get("degree", ""),
+            edu.get("field", ""),
+            edu.get("location", ""),
+            edu.get("graduation_date", ""),
+            edu.get("gpa", "")
+        ])
+
+    # Experience
     for exp in resume_json.get("experience", []):
-        parts += [exp.get("company", ""), exp.get("position", "")]
-        parts += exp.get("achievements", [])
-    for prj in resume_json.get("projects", []):
-        parts += [prj.get("title", ""), prj.get("description", "")]
-        parts += prj.get("technologies", [])
-        parts += prj.get("bullets", [])
-    for cat, items in (resume_json.get("skills", {}) or {}).items():
-        parts += items
-    parts += resume_json.get("languages", [])
-    return " \n ".join([p for p in parts if p])
+        parts.extend([
+            exp.get("company", ""),
+            exp.get("position", ""),
+            exp.get("location", ""),
+            exp.get("start_date", ""),
+            exp.get("end_date", "")
+        ])
+        parts.extend(exp.get("achievements", []))  # achievements is a list
+
+    # Projects
+    for proj in resume_json.get("projects", []):
+        parts.extend([
+            proj.get("title", ""),
+            proj.get("description", "")
+        ])
+        parts.extend(proj.get("technologies", []))
+        parts.extend(proj.get("bullets", []))
+
+    # Certifications
+    parts.extend(resume_json.get("certifications", []))
+
+    # Skills
+    skills = resume_json.get("skills", {})
+    for cat, items in skills.items():
+        parts.append(cat)
+        parts.extend(items)
+
+    # Languages
+    parts.extend(resume_json.get("languages", []))
+
+    # Join everything as a string
+    return " \n ".join([str(p) for p in parts if p])
 
 
 def _extract_years_experience(start_date: str, end_date: str) -> float:

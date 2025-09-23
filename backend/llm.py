@@ -88,21 +88,158 @@ def _get_model() -> Any:
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         # Fallback to a hardcoded key for testing
-        api_key = "AIzaSyBApwUQwyC8fdB59houV5Ofx5yNQSgUX_M"
+        api_key = "AIzaSyDGAHIO-v1Nhoae9JZQpc4J6oPaVOWeHT8"
     genai.configure(api_key=api_key)
     return genai.GenerativeModel("gemini-1.5-flash")
 
 
 def rewrite_resume(resume_json: Dict[str, Any], job_description: str) -> Dict[str, Any]:
-    # Temporarily bypass LLM for testing - return original resume with proper structure
-    print("********** CLAUDE DEBUG: REWRITE_RESUME CALLED **********")
-    print(f"Input resume keys: {list(resume_json.keys())}")
+    """
+    Tailor the resume JSON to the given job description using Gemini.
+    Preserves the full schema and only updates fields that the LLM improves.
+    """
+    model = _get_model()
 
-    # For now, just return the original resume to test the flow
-    result = resume_json.copy()
-    print(f"Returning result keys: {list(result.keys())}")
-    print("********** END CLAUDE DEBUG **********")
-    return result
+    prompt = f"""
+You are a professional resume optimization expert.
+
+ORIGINAL RESUME JSON:
+{json.dumps(resume_json, indent=2)}
+
+JOB DESCRIPTION:
+{job_description}
+
+TASK:
+- Optimize ONLY the existing fields in the resume JSON for the job description.
+- Keep the EXACT same schema and keys as the original resume JSON.
+- Do not add new keys or remove any existing ones.
+- Rewrite summary to highlight JD-relevant strengths.
+- Reorder skills, projects, and experience by JD relevance.
+- Improve achievements for ATS readability (≤1.5 lines).
+- Do NOT invent new jobs, degrees, certifications, or skills.
+- If a field is empty in the original JSON, leave it empty.
+
+OUTPUT:
+Return the COMPLETE resume JSON with the same schema as ORIGINAL RESUME JSON,
+but optimized for the job description.
+"""
+
+    try:
+        response = model.generate_content(prompt)
+        text = response.text or "{}"
+
+        # Debug raw LLM output
+        print("DEBUG Raw LLM output:", text[:1000])
+
+        # Extract JSON from markdown fences if present
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0]
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0]
+
+        llm_output = json.loads(text)
+
+        # ✅ Start from original resume JSON
+        result = resume_json.copy()
+
+        # ✅ Update only if LLM returned that section
+        for key in result.keys():
+            if key in llm_output and llm_output[key]:
+                result[key] = llm_output[key]
+
+        print("DEBUG Final tailored JSON keys:", list(result.keys()))
+        return result
+
+    except Exception as e:
+        print(f"LLM processing error in rewrite_resume: {e}")
+        return resume_json
+
+    model = _get_model()
+
+    # Create tailoring prompt that requests complete resume JSON
+    prompt = f"""
+You are a professional resume optimization expert.
+
+ORIGINAL RESUME JSON:
+{json.dumps(resume_json, indent=2)}
+
+JOB DESCRIPTION:
+{job_description}
+
+{PROMPT_TEMPLATE}
+
+TASK: Return the COMPLETE resume JSON with the EXACT same structure as the input, but optimized for the job description.
+
+REQUIRED OUTPUT FORMAT - You MUST return JSON in this EXACT structure:
+{{
+  "contact_info": {{"full_name": "", "email": "", "phone": "", "location": ""}},
+  "links": {{}},
+  "summary": "",
+  "education": [],
+  "experience": [],
+  "projects": [],
+  "certifications": [],
+  "skills": {{}},
+  "languages": []
+}}
+
+SPECIFIC REQUIREMENTS:
+1. Reorder skills categories by relevance to the job description
+2. Reorder individual skills within each category by relevance
+3. Reorder experience entries by relevance to the job description
+4. Reorder projects by relevance to the job description
+5. Rewrite summary to highlight strengths relevant to the job description
+6. Optimize experience bullets for ATS and readability (keep ≤1.5 lines each)
+7. Add relevant keywords from job description where they naturally fit
+8. PRESERVE all original data - do not invent new companies, skills, or achievements
+
+CRITICAL: Return the complete resume JSON with ALL original fields preserved in the EXACT schema shown above.
+"""
+
+    try:
+        response = model.generate_content(prompt)
+        text = response.text or "{}"
+
+        print("DEBUG: Raw LLM output:\n", text[:1000])  # first 1000 chars
+
+
+        # Clean the response to extract JSON
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0]
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0]
+
+        llm_output = json.loads(text)
+        print("DEBUG: Parsed LLM JSON keys:", list(llm_output.keys()))
+
+        # ✅ Start with original resume_json
+        result = resume_json.copy()
+
+        
+        # ✅ Only update fields if present in LLM output
+        if "summary" in llm_output and llm_output["summary"]:
+            result["summary"] = llm_output["summary"]
+
+        if "skills" in llm_output and llm_output["skills"]:
+            result["skills"] = llm_output["skills"]
+
+        if "experience" in llm_output and llm_output["experience"]:
+            result["experience"] = llm_output["experience"]
+
+        if "projects" in llm_output and llm_output["projects"]:
+            result["projects"] = llm_output["projects"]
+
+        # Return complete resume JSON
+        return result
+        print("DEBUG Input JSON keys:", list(resume_json.keys()))
+        print("DEBUG LLM Output keys:", list(llm_output.keys()))
+        print("DEBUG Final JSON keys:", list(result.keys()))
+
+
+    except Exception as e:
+        print(f"LLM processing error: {e}")
+        # Return original data if optimization fails
+        return resume_json
 
 
 def validate_and_merge_resume(llm_output: Dict[str, Any], original_resume: Dict[str, Any]) -> Dict[str, Any]:
@@ -245,49 +382,96 @@ def generate_interview_questions(resume_json: Dict[str, Any], job_description: s
         return response.text or "Unable to generate interview questions at this time."
     except Exception:
         return "Unable to generate interview questions at this time."
-import json
-from backend.llm import _get_model   # if inside same file, remove this line
+def clean_resume_json(data: Any) -> Any:
+    """
+    Recursively clean resume JSON:
+    - Replace None/null with "" or []
+    - Ensure schema consistency
+    """
+    if isinstance(data, dict):
+        return {k: clean_resume_json(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [clean_resume_json(v) for v in data]
+    elif data is None:
+        return ""
+    else:
+        return data
 
-RESUME_SCHEMA_PROMPT = """
-You are a resume parser. 
-Input: raw resume text.
-Output: JSON strictly matching this schema:
 
-{
-  "contact_info": {"full_name": "", "email": "", "phone": "", "location": ""},
-  "links": {"LinkedIn": "", "GitHub": "", "HuggingFace": "", "Coursera": ""},
+def llm_parse_resume(resume_text: str) -> Dict[str, Any]:
+    """
+    Parse raw resume text into a structured JSON format using Gemini.
+    Ensures schema is always present and no null values.
+    """
+    model = _get_model()
+
+    prompt = f"""
+You are a resume parsing assistant.
+
+Extract all structured data from the following resume text:
+
+{resume_text}
+
+Return JSON strictly in this schema:
+{{
+  "contact_info": {{"full_name": "", "email": "", "phone": "", "location": ""}},
+  "links": {{"LinkedIn": "", "GitHub": "", "HuggingFace": "", "Coursera": ""}},
   "summary": "",
-  "education": [{"institution": "", "degree": "", "field": "", "location": "", "graduation_date": "", "gpa": ""}],
-  "experience": [{"company": "", "position": "", "location": "", "start_date": "", "end_date": "", "achievements": []}],
-  "projects": [{"title": "", "description": "", "technologies": [], "bullets": []}],
+  "education": [
+    {{"institution":"", "degree":"", "field":"", "location":"", "graduation_date":"", "gpa":""}}
+  ],
+  "experience": [
+    {{"company":"", "position":"", "location":"", "start_date":"", "end_date":"", "achievements":[]}}
+  ],
+  "projects": [
+    {{"title":"", "description":"", "technologies":[], "bullets":[]}}
+  ],
   "certifications": [],
-  "skills": {"Technical": [], "Non-Technical": []},
+  "skills": {{"Technical":[], "Non-Technical":[]}},
   "languages": []
-}
+}}
 
 Rules:
-- Only extract what exists in the resume text.
-- Do not hallucinate or invent data.
-- Keep original wording for dates, degrees, roles.
-- If a field is missing, leave it empty (do not delete keys).
+- Always include all fields, even if empty.
+- If information is missing, use "" or [] (never null).
+- Preserve the exact JSON schema shown above.
+- Extract as much detail as possible for education, experience, and projects.
 """
 
-def llm_parse_resume(raw_text: str) -> dict:
-    model = _get_model()
-    prompt = f"{RESUME_SCHEMA_PROMPT}\n\nResume text:\n{raw_text}"
-    response = model.generate_content(prompt)
-    text = response.text.strip()
-
-    # Clean out JSON from markdown fences if present
-    if "```json" in text:
-        text = text.split("```json")[1].split("```")[0].strip()
-    elif "```" in text:
-        text = text.split("```")[1].strip()
-
     try:
-        return json.loads(text)
+        response = model.generate_content(prompt)
+        text = response.text or "{}"
+
+        # Debug raw LLM output
+        print("DEBUG Raw LLM output:", text[:1000])
+
+        # Extract JSON from markdown fences
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0]
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0]
+
+        llm_output = json.loads(text)
+
+        # Clean nulls and enforce schema
+        resume_json = clean_resume_json(llm_output)
+
+        # Debug final keys
+        print("DEBUG Final parsed JSON keys:", list(resume_json.keys()))
+        return resume_json
+
     except Exception as e:
-        raise ValueError(f"Failed to parse LLM output as JSON: {e}\nOutput was:\n{text}")
+        print(f"LLM processing error in llm_parse_resume: {e}")
+        return {
+            "contact_info": {"full_name": "", "email": "", "phone": "", "location": ""},
+            "links": {"LinkedIn": "", "GitHub": "", "HuggingFace": "", "Coursera": ""},
+            "summary": "",
+            "education": [],
+            "experience": [],
+            "projects": [],
+            "certifications": [],
+            "skills": {"Technical": [], "Non-Technical": []},
+            "languages": []
+        }
 
-
-__all__ = ["rewrite_resume", "generate_cover_letter", "generate_interview_questions"]
+__all__ = ["rewrite_resume", "generate_cover_letter", "generate_interview_questions", "llm_parse_resume"]
