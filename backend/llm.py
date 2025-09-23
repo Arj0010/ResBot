@@ -24,8 +24,9 @@ CRITICAL RULES - STRICT DATA PRESERVATION:
 Your job is to ONLY:
 1. Rewrite EXISTING summary if it exists (if empty, return empty)
 2. Optimize EXISTING experience bullets for ATS and readability (≤1.5 lines each)
-3. Reorder EXISTING skills by relevance to job description
+3. Reorder EXISTING skills by relevance to job description (keep same categories)
 4. Reorder EXISTING projects by relevance (do not add or remove projects)
+5. Reorder EXISTING experience by relevance to job description
 
 Quality Guidelines:
 - Each experience bullet should be ≤1.5 lines for ATS compatibility
@@ -37,24 +38,10 @@ Constraints:
 - Maximum 3-4 bullets per experience entry (use the most impactful existing ones)
 - If original has fewer bullets, don't add more
 - Return ONLY data that was in the original resume
-- Preserve the exact JSON structure provided
+- Preserve the EXACT same JSON structure as input
+- Return the COMPLETE resume JSON with ALL original fields
 
-Output JSON (preserve exact structure):
-{
-  "rewritten_summary": "..." (only if original had summary, otherwise ""),
-  "rewritten_experience": [
-    {
-      "company": "exact original company name",
-      "bullets": ["improved versions of original achievements only"]
-    }
-  ],
-  "ranked_skills": {
-    "Programming & Tools": ["reordered original skills only"],
-    "ML & AI": ["reordered original skills only"],
-    "Analytics": ["reordered original skills only"]
-  },
-  "ranked_projects": ["reordered original project titles only"]
-}
+Output: Return the complete resume JSON with optimizations applied but preserving all original structure and data.
 """
 ).strip()
 
@@ -108,120 +95,130 @@ def _get_model() -> Any:
 
 def rewrite_resume(resume_json: Dict[str, Any], job_description: str) -> Dict[str, Any]:
     model = _get_model()
-    
-    # Add validation prompt with the original data structure
-    validation_prompt = f"""
-Original Resume Structure (DO NOT MODIFY THIS STRUCTURE):
+
+    # Create optimization prompt
+    prompt = f"""
+Original Resume JSON:
 {json.dumps(resume_json, indent=2)}
 
-{PROMPT_TEMPLATE}
 Job Description:
 {job_description}
 
-IMPORTANT: Your response must preserve the exact structure above. Only improve the content quality, do not add new data.
+{PROMPT_TEMPLATE}
+
+IMPORTANT: Return the COMPLETE resume JSON with the EXACT same structure as the input, but with optimizations applied.
 """
-    
+
     try:
-        response = model.generate_content(validation_prompt)
+        response = model.generate_content(prompt)
         text = response.text or "{}"
-        
+
         # Clean the response to extract JSON
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0]
         elif "```" in text:
             text = text.split("```")[1].split("```")[0]
-        
+
         payload = json.loads(text)
-        
-        # Strict validation - ensure no hallucinated data
-        validated_payload = validate_llm_output(payload, resume_json)
-        return validated_payload
-        
+
+        # Validate and merge with original to ensure completeness
+        optimized_resume = validate_and_merge_resume(payload, resume_json)
+        return optimized_resume
+
     except Exception as e:
         print(f"LLM processing error: {e}")
-        # Return safe fallback that preserves original data
-        return create_safe_fallback(resume_json)
+        # Return original data if optimization fails
+        return resume_json
 
 
-def validate_llm_output(llm_output: Dict[str, Any], original_resume: Dict[str, Any]) -> Dict[str, Any]:
-    """Strict validation to prevent hallucinations"""
-    validated = {}
-    
-    # Validate summary - only if original had one
-    original_summary = original_resume.get("summary", "").strip()
-    if original_summary:
-        validated["rewritten_summary"] = llm_output.get("rewritten_summary", original_summary)
-    else:
-        validated["rewritten_summary"] = ""
-    
-    # Validate experience - only allow existing companies
-    validated["rewritten_experience"] = []
-    original_companies = {exp.get("company", ""): exp for exp in original_resume.get("experience", [])}
-    
-    for exp in llm_output.get("rewritten_experience", []):
-        company = exp.get("company", "")
-        if company in original_companies:
-            original_exp = original_companies[company]
-            # Only use bullets if they're reasonable improvements of originals
-            original_bullets = original_exp.get("achievements", [])
-            new_bullets = exp.get("bullets", [])
-            
-            # Limit to original bullet count or fewer
-            max_bullets = min(len(original_bullets), len(new_bullets), 4)
-            validated_bullets = new_bullets[:max_bullets] if new_bullets else original_bullets
-            
-            validated["rewritten_experience"].append({
-                "company": company,
-                "bullets": validated_bullets
-            })
-    
-    # Validate skills - only allow existing skills, just reordered
-    original_skills = original_resume.get("skills", {})
-    validated["ranked_skills"] = {}
-    
-    for category in ["Programming & Tools", "ML & AI", "Analytics"]:
-        original_cat_skills = set(original_skills.get(category, []))
-        llm_cat_skills = llm_output.get("ranked_skills", {}).get(category, [])
-        
-        # Only include skills that were in the original
-        validated_skills = [skill for skill in llm_cat_skills if skill in original_cat_skills]
-        # Add any missing original skills
-        for original_skill in original_skills.get(category, []):
-            if original_skill not in validated_skills:
-                validated_skills.append(original_skill)
-        
-        validated["ranked_skills"][category] = validated_skills
-    
-    # Validate projects - only allow existing project titles
-    original_project_titles = set(proj.get("title", "") for proj in original_resume.get("projects", []))
-    llm_projects = llm_output.get("ranked_projects", [])
-    
-    validated_projects = [title for title in llm_projects if title in original_project_titles]
-    # Add any missing original projects
-    for proj in original_resume.get("projects", []):
-        title = proj.get("title", "")
-        if title not in validated_projects:
-            validated_projects.append(title)
-    
-    validated["ranked_projects"] = validated_projects
-    
-    return validated
+def validate_and_merge_resume(llm_output: Dict[str, Any], original_resume: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate LLM output and merge with original to ensure complete resume structure"""
+    # Start with original resume as base
+    result = original_resume.copy()
 
+    # Validate and update summary if improved
+    if llm_output.get("summary") and original_resume.get("summary"):
+        result["summary"] = llm_output["summary"]
 
-def create_safe_fallback(original_resume: Dict[str, Any]) -> Dict[str, Any]:
-    """Create a safe fallback that preserves all original data"""
-    return {
-        "rewritten_summary": original_resume.get("summary", ""),
-        "rewritten_experience": [
-            {
-                "company": exp.get("company", ""),
-                "bullets": exp.get("achievements", [])
-            }
-            for exp in original_resume.get("experience", [])
-        ],
-        "ranked_skills": original_resume.get("skills", {}),
-        "ranked_projects": [proj.get("title", "") for proj in original_resume.get("projects", [])]
-    }
+    # Validate and update experience if improved
+    if llm_output.get("experience"):
+        original_companies = {exp.get("company", ""): exp for exp in original_resume.get("experience", [])}
+        validated_experience = []
+
+        # Process LLM-optimized experience
+        for llm_exp in llm_output["experience"]:
+            company = llm_exp.get("company", "")
+            if company in original_companies:
+                # Merge optimized content with original structure
+                original_exp = original_companies[company].copy()
+
+                # Update achievements if provided and valid
+                if llm_exp.get("achievements"):
+                    # Limit bullets to reasonable count
+                    max_bullets = min(len(llm_exp["achievements"]), 4)
+                    original_exp["achievements"] = llm_exp["achievements"][:max_bullets]
+
+                validated_experience.append(original_exp)
+                # Remove from original_companies to track processed companies
+                del original_companies[company]
+
+        # Add any remaining companies that weren't processed by LLM
+        for remaining_exp in original_companies.values():
+            validated_experience.append(remaining_exp)
+
+        result["experience"] = validated_experience
+
+    # Validate and update skills if reordered
+    if llm_output.get("skills"):
+        original_skills = original_resume.get("skills", {})
+        validated_skills = {}
+
+        # Process each category from LLM output
+        for category, skills in llm_output["skills"].items():
+            if category in original_skills:
+                # Only include skills that existed in original
+                original_category_skills = set(original_skills[category])
+                filtered_skills = [skill for skill in skills if skill in original_category_skills]
+
+                # Add any missing original skills
+                for orig_skill in original_skills[category]:
+                    if orig_skill not in filtered_skills:
+                        filtered_skills.append(orig_skill)
+
+                validated_skills[category] = filtered_skills
+
+        # Add any categories not processed by LLM
+        for category, skills in original_skills.items():
+            if category not in validated_skills:
+                validated_skills[category] = skills
+
+        result["skills"] = validated_skills
+
+    # Validate and update projects if reordered
+    if llm_output.get("projects"):
+        original_projects = {proj.get("title", ""): proj for proj in original_resume.get("projects", [])}
+        validated_projects = []
+
+        # Process LLM-reordered projects
+        for llm_proj in llm_output["projects"]:
+            title = llm_proj.get("title", "")
+            if title in original_projects:
+                # Use original project data but with optimized bullets if provided
+                original_proj = original_projects[title].copy()
+                if llm_proj.get("bullets"):
+                    max_bullets = min(len(llm_proj["bullets"]), 3)
+                    original_proj["bullets"] = llm_proj["bullets"][:max_bullets]
+
+                validated_projects.append(original_proj)
+                del original_projects[title]
+
+        # Add any remaining projects
+        for remaining_proj in original_projects.values():
+            validated_projects.append(remaining_proj)
+
+        result["projects"] = validated_projects
+
+    return result
 
 
 def generate_cover_letter(resume_json: Dict[str, Any], job_description: str, company_name: str = "", position_title: str = "") -> str:

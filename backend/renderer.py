@@ -337,26 +337,18 @@ def _add_skills_section_docx(doc, skills_dict):
     divider_run = divider_para.add_run("_" * 87)
     divider_para.paragraph_format.space_after = Pt(3)  # Reduced from 6pt
 
-    # Skill categories with Harvard formatting (parentheses)
-    categories = {
-        'Programming & Tools': 'Programming & Tools',
-        'ML & AI': 'ML & AI',
-        'Analytics': 'Analytics'
-    }
-
-    for key, title in categories.items():
-        if skills_dict.get(key):
-            # Category title (bold)
-            cat_para = doc.add_paragraph()
-            cat_run = cat_para.add_run(f"{title}:")
-            cat_run.font.bold = True
-            cat_para.paragraph_format.space_after = Pt(0)
-
-            # Skills in parentheses format
+    # Dynamic skill categories - process all categories in skills_dict
+    for category, skills in skills_dict.items():
+        if skills:  # Only show categories that have skills
+            # Category title (bold) with skills in same line
             skills_para = doc.add_paragraph()
-            skills_text = ' '.join([f"({_safe_text(skill)})" for skill in skills_dict[key]])
-            skills_para.add_run(skills_text)
-            skills_para.paragraph_format.space_after = Pt(2)  # Reduced from 6pt
+            title_run = skills_para.add_run(f"{category} ")
+            title_run.font.bold = True
+
+            # Skills in comma-separated format in parentheses
+            skills_text = ', '.join([_safe_text(skill) for skill in skills])
+            skills_para.add_run(f"({skills_text})")
+            skills_para.paragraph_format.space_after = Pt(3)
 
 
 def _add_languages_section_docx(doc, languages_list):
