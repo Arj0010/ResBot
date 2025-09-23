@@ -94,15 +94,68 @@ def _get_model() -> Any:
 
 
 def rewrite_resume(resume_json: Dict[str, Any], job_description: str) -> Dict[str, Any]:
-    # Temporarily bypass LLM for testing - return original resume with proper structure
-    print("********** CLAUDE DEBUG: REWRITE_RESUME CALLED **********")
-    print(f"Input resume keys: {list(resume_json.keys())}")
+    model = _get_model()
 
-    # For now, just return the original resume to test the flow
-    result = resume_json.copy()
-    print(f"Returning result keys: {list(result.keys())}")
-    print("********** END CLAUDE DEBUG **********")
-    return result
+    # Create tailoring prompt that requests complete resume JSON
+    prompt = f"""
+You are a professional resume optimization expert.
+
+ORIGINAL RESUME JSON:
+{json.dumps(resume_json, indent=2)}
+
+JOB DESCRIPTION:
+{job_description}
+
+{PROMPT_TEMPLATE}
+
+TASK: Return the COMPLETE resume JSON with the EXACT same structure as the input, but optimized for the job description.
+
+REQUIRED OUTPUT FORMAT - You MUST return JSON in this EXACT structure:
+{{
+  "contact_info": {{"full_name": "", "email": "", "phone": "", "location": ""}},
+  "links": {{}},
+  "summary": "",
+  "education": [],
+  "experience": [],
+  "projects": [],
+  "certifications": [],
+  "skills": {{}},
+  "languages": []
+}}
+
+SPECIFIC REQUIREMENTS:
+1. Reorder skills categories by relevance to the job description
+2. Reorder individual skills within each category by relevance
+3. Reorder experience entries by relevance to the job description
+4. Reorder projects by relevance to the job description
+5. Rewrite summary to highlight strengths relevant to the job description
+6. Optimize experience bullets for ATS and readability (keep ≤1.5 lines each)
+7. Add relevant keywords from job description where they naturally fit
+8. PRESERVE all original data - do not invent new companies, skills, or achievements
+
+CRITICAL: Return the complete resume JSON with ALL original fields preserved in the EXACT schema shown above.
+"""
+
+    try:
+        response = model.generate_content(prompt)
+        text = response.text or "{}"
+
+        # Clean the response to extract JSON
+        if "```json" in text:
+            text = text.split("```json")[1].split("```")[0]
+        elif "```" in text:
+            text = text.split("```")[1].split("```")[0]
+
+        llm_output = json.loads(text)
+
+        # Validate and merge with original to ensure completeness
+        tailored_resume = validate_and_merge_resume(llm_output, resume_json)
+        return tailored_resume
+
+    except Exception as e:
+        print(f"LLM processing error: {e}")
+        # Return original data if optimization fails
+        return resume_json
 
 
 def validate_and_merge_resume(llm_output: Dict[str, Any], original_resume: Dict[str, Any]) -> Dict[str, Any]:
