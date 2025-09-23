@@ -24,8 +24,9 @@ CRITICAL RULES - STRICT DATA PRESERVATION:
 Your job is to ONLY:
 1. Rewrite EXISTING summary if it exists (if empty, return empty)
 2. Optimize EXISTING experience bullets for ATS and readability (≤1.5 lines each)
-3. Reorder EXISTING skills by relevance to job description
-4. Reorder EXISTING projects by relevance (do not add or remove projects)
+3. INCLUDE ALL COMPANIES from original resume - do not skip any work experience
+4. Reorder EXISTING skills by relevance to job description
+5. Reorder EXISTING projects by relevance (do not add or remove projects)
 
 Quality Guidelines:
 - Each experience bullet should be ≤1.5 lines for ATS compatibility
@@ -36,6 +37,7 @@ Quality Guidelines:
 Constraints:
 - Maximum 3-4 bullets per experience entry (use the most impactful existing ones)
 - If original has fewer bullets, don't add more
+- MUST include ALL companies/organizations from original experience section
 - Return ONLY data that was in the original resume
 - Preserve the exact JSON structure provided
 
@@ -154,26 +156,35 @@ def validate_llm_output(llm_output: Dict[str, Any], original_resume: Dict[str, A
     else:
         validated["rewritten_summary"] = ""
     
-    # Validate experience - only allow existing companies
+    # Validate experience - PRESERVE ALL original companies
     validated["rewritten_experience"] = []
     original_companies = {exp.get("company", ""): exp for exp in original_resume.get("experience", [])}
-    
+
+    # Create a mapping of LLM-improved bullets by company
+    llm_company_bullets = {}
     for exp in llm_output.get("rewritten_experience", []):
         company = exp.get("company", "")
         if company in original_companies:
-            original_exp = original_companies[company]
-            # Only use bullets if they're reasonable improvements of originals
-            original_bullets = original_exp.get("achievements", [])
-            new_bullets = exp.get("bullets", [])
-            
-            # Limit to original bullet count or fewer
-            max_bullets = min(len(original_bullets), len(new_bullets), 4)
-            validated_bullets = new_bullets[:max_bullets] if new_bullets else original_bullets
-            
-            validated["rewritten_experience"].append({
-                "company": company,
-                "bullets": validated_bullets
-            })
+            llm_company_bullets[company] = exp.get("bullets", [])
+
+    # Ensure ALL original companies are included, with LLM improvements where available
+    for company, original_exp in original_companies.items():
+        original_bullets = original_exp.get("achievements", [])
+
+        # Use LLM-improved bullets if available, otherwise keep originals
+        if company in llm_company_bullets and llm_company_bullets[company]:
+            # Limit to original bullet count or fewer, but ensure reasonable count
+            max_bullets = min(len(original_bullets), len(llm_company_bullets[company]), 4)
+            max_bullets = max(max_bullets, 1)  # Ensure at least 1 bullet per company
+            validated_bullets = llm_company_bullets[company][:max_bullets]
+        else:
+            # Keep original bullets if LLM didn't improve them
+            validated_bullets = original_bullets[:4]  # Limit to 4 max
+
+        validated["rewritten_experience"].append({
+            "company": company,
+            "bullets": validated_bullets
+        })
     
     # Validate skills - only allow existing skills, just reordered
     original_skills = original_resume.get("skills", {})
@@ -209,13 +220,13 @@ def validate_llm_output(llm_output: Dict[str, Any], original_resume: Dict[str, A
 
 
 def create_safe_fallback(original_resume: Dict[str, Any]) -> Dict[str, Any]:
-    """Create a safe fallback that preserves all original data"""
+    """Create a safe fallback that preserves ALL original data without any loss"""
     return {
         "rewritten_summary": original_resume.get("summary", ""),
         "rewritten_experience": [
             {
                 "company": exp.get("company", ""),
-                "bullets": exp.get("achievements", [])
+                "bullets": exp.get("achievements", [])[:4]  # Limit to 4 bullets max per company
             }
             for exp in original_resume.get("experience", [])
         ],
