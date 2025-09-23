@@ -70,74 +70,42 @@ def render_harvard(resume_json: Dict[str, Any], output_path: str, template_confi
             section.left_margin = Inches(0.5)
             section.right_margin = Inches(0.5)
 
-        # Style configuration - Calibri 10pt as per requirements
+        # Style configuration - Calibri 9pt for 6-company one-page layout
         style = doc.styles['Normal']
         style.font.name = 'Calibri'
-        style.font.size = Pt(10)  # Standard size per requirements
-        # Proper line spacing for readability
-        style.paragraph_format.line_spacing = 1.0
-        style.paragraph_format.space_after = Pt(3)
+        style.font.size = Pt(9)  # Reduced to 9pt for more space
+        # Ultra-compact line spacing for 6 companies
+        style.paragraph_format.line_spacing = 0.9
+        style.paragraph_format.space_after = Pt(1)
 
-        # Header - Name (centered) - Calibri 12pt as per requirements
+        # Header - Name (centered) - compact for 6 companies
         contact = resume_json.get('contact_info', {})
         name_para = doc.add_paragraph()
         name_run = name_para.add_run(_safe_text(contact.get('full_name', 'NAME')))
-        name_run.font.name = 'Calibri'
-        name_run.font.size = Pt(12)  # Size 12 for name as specified
+        name_run.font.size = Pt(12)  # Further reduced for space
         name_run.font.bold = True
         name_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        name_para.paragraph_format.space_after = Pt(3)
+        name_para.paragraph_format.space_after = Pt(1)  # Minimal spacing
 
-        # Contact line (centered) with hyperlinks where applicable
+        # Contact line (centered)
         contact_para = doc.add_paragraph()
-        contact_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        contact_info = []
         links = resume_json.get('links', {})
 
-        contact_items = []
         if contact.get('email'):
-            contact_items.append(('email', contact['email'], f"mailto:{contact['email']}"))
+            contact_info.append(contact['email'])
         if contact.get('phone'):
-            contact_items.append(('text', contact['phone'], None))
-        if contact.get('location'):
-            contact_items.append(('text', contact['location'], None))
+            contact_info.append(contact['phone'])
         if links.get('LinkedIn'):
-            linkedin_url = links['LinkedIn']
-            display_text = linkedin_url.replace('https://', '').replace('http://', '')
-            contact_items.append(('link', display_text, linkedin_url))
-
-        # Add contact items with proper hyperlinks
-        for i, (item_type, text, url) in enumerate(contact_items):
-            if i > 0:
-                contact_para.add_run(' | ')
-
-            if item_type == 'link' and url:
-                _add_hyperlink(contact_para, url, text)
-            elif item_type == 'email' and url:
-                _add_hyperlink(contact_para, url, text)
-            else:
-                contact_para.add_run(text)
-
-        contact_para.paragraph_format.space_after = Pt(3)
-
-        # Second line with additional links (GitHub, HuggingFace) if they exist
-        additional_links = []
+            contact_info.append('LinkedIn')
         if links.get('GitHub'):
-            github_url = links['GitHub']
-            display_text = github_url.replace('https://', '').replace('http://', '')
-            additional_links.append((display_text, github_url))
+            contact_info.append('GitHub')
         if links.get('HuggingFace'):
-            hf_url = links['HuggingFace']
-            display_text = hf_url.replace('https://', '').replace('http://', '')
-            additional_links.append((display_text, hf_url))
+            contact_info.append('HuggingFace')
 
-        if additional_links:
-            links_para = doc.add_paragraph()
-            links_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            for i, (text, url) in enumerate(additional_links):
-                if i > 0:
-                    links_para.add_run(' | ')
-                _add_hyperlink(links_para, url, text)
-            links_para.paragraph_format.space_after = Pt(6)
+        contact_para.add_run(' • '.join(contact_info))
+        contact_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        contact_para.paragraph_format.space_after = Pt(3)  # Ultra-compact for 6 companies
 
         # Career Objective
         if resume_json.get('summary'):
@@ -181,39 +149,37 @@ def render_harvard(resume_json: Dict[str, Any], output_path: str, template_confi
 
 def _add_section_docx(doc, title: str, content: str):
     """Add a section with title and content to DOCX"""
-    # Section title - Calibri 10pt as per requirements
+    # Section title
     title_para = doc.add_paragraph()
     title_run = title_para.add_run(title)
-    title_run.font.name = 'Calibri'
     title_run.font.bold = True
-    title_run.font.size = Pt(10)  # Size 10 for headers as specified
-    title_para.paragraph_format.space_before = Pt(6)
+    title_run.font.size = Pt(10)  # Ultra-compact for 6 companies
+    title_para.paragraph_format.space_before = Pt(3)  # Minimal spacing
     title_para.paragraph_format.space_after = Pt(0)
 
     # Divider line
     divider_para = doc.add_paragraph()
     divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(3)
+    divider_para.paragraph_format.space_after = Pt(1)  # Ultra-compact
 
     # Content
     content_para = doc.add_paragraph(_safe_text(content))
-    content_para.paragraph_format.space_after = Pt(3)
+    content_para.paragraph_format.space_after = Pt(1)  # Ultra-compact
 
 
 def _add_education_section_docx(doc, education_list):
     """Add education section to DOCX"""
-    # Section title - Calibri 10pt as per requirements
+    # Section title
     title_para = doc.add_paragraph()
     title_run = title_para.add_run("EDUCATION")
-    title_run.font.name = 'Calibri'
     title_run.font.bold = True
-    title_run.font.size = Pt(10)  # Size 10 for headers as specified
-    title_para.paragraph_format.space_before = Pt(6)
+    title_run.font.size = Pt(11)  # Reduced from 13pt
+    title_para.paragraph_format.space_before = Pt(6)  # Reduced from 12pt
 
     # Divider
     divider_para = doc.add_paragraph()
     divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(3)
+    divider_para.paragraph_format.space_after = Pt(3)  # Reduced from 6pt
 
     # Education entries
     for edu in education_list:
@@ -246,18 +212,17 @@ def _add_education_section_docx(doc, education_list):
 
 def _add_experience_section_docx(doc, experience_list):
     """Add experience section to DOCX"""
-    # Section title - Calibri 10pt as per requirements
+    # Section title
     title_para = doc.add_paragraph()
     title_run = title_para.add_run("EXPERIENCE")
-    title_run.font.name = 'Calibri'
     title_run.font.bold = True
-    title_run.font.size = Pt(10)  # Size 10 for headers as specified
-    title_para.paragraph_format.space_before = Pt(6)
+    title_run.font.size = Pt(11)  # Reduced from 13pt
+    title_para.paragraph_format.space_before = Pt(6)  # Reduced from 12pt
 
     # Divider
     divider_para = doc.add_paragraph()
     divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(3)
+    divider_para.paragraph_format.space_after = Pt(3)  # Reduced from 6pt
 
     # Experience entries
     for exp in experience_list:
@@ -280,48 +245,37 @@ def _add_experience_section_docx(doc, experience_list):
         date_para.add_run(_safe_text(date_location))
         date_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
-        # Optimized bullet allocation for 1-page compliance
+        # Smart bullet allocation for all 6 companies based on recency
         exp_index = experience_list.index(exp)
-        total_companies = len(experience_list)
-
-        # Dynamic bullet allocation based on total number of companies
-        if total_companies <= 3:
-            bullet_limit = 4  # More space available
-        elif total_companies <= 4:
-            bullet_limit = 3 if exp_index <= 1 else 2  # Recent companies get more
-        else:  # 5+ companies - very compact
-            if exp_index <= 1:
-                bullet_limit = 3  # Most recent: 3 bullets
-            elif exp_index <= 3:
-                bullet_limit = 2  # Mid-career: 2 bullets
-            else:
-                bullet_limit = 1  # Early career: 1 bullet
+        if exp_index <= 1:  # Companies 1-2 (most recent): 3 bullets
+            bullet_limit = 3
+        elif exp_index <= 3:  # Companies 3-4 (mid-career): 2 bullets
+            bullet_limit = 2
+        else:  # Companies 5-6 (early career): 1-2 bullets
+            bullet_limit = 1 if exp_index == 5 else 2
 
         for bullet in exp.get('achievements', [])[:bullet_limit]:
             bullet_para = doc.add_paragraph()
             bullet_para.add_run(f"• {_safe_text(bullet)}")
-            bullet_para.paragraph_format.space_after = Pt(1)  # Compact but readable
-            bullet_para.paragraph_format.left_indent = Inches(0.25)  # Proper indentation
+            bullet_para.paragraph_format.space_after = Pt(0.5)  # Ultra-compact for 6 companies
 
-        # Minimal space between jobs for 1-page compliance
-        if exp_index < len(experience_list) - 1:  # Don't add space after last job
-            doc.add_paragraph().paragraph_format.space_after = Pt(2)
+        # Space between jobs - minimal for 6 companies
+        doc.add_paragraph().paragraph_format.space_after = Pt(1.5)  # Ultra-compact
 
 
 def _add_projects_section_docx(doc, projects_list):
     """Add projects section to DOCX"""
-    # Section title - Calibri 10pt as per requirements
+    # Section title
     title_para = doc.add_paragraph()
     title_run = title_para.add_run("PROJECTS")
-    title_run.font.name = 'Calibri'
     title_run.font.bold = True
-    title_run.font.size = Pt(10)  # Size 10 for headers as specified
-    title_para.paragraph_format.space_before = Pt(6)
+    title_run.font.size = Pt(11)  # Reduced from 13pt
+    title_para.paragraph_format.space_before = Pt(6)  # Reduced from 12pt
 
     # Divider
     divider_para = doc.add_paragraph()
     divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(3)
+    divider_para.paragraph_format.space_after = Pt(3)  # Reduced from 6pt
 
     # Project entries
     for project in projects_list:
@@ -330,87 +284,79 @@ def _add_projects_section_docx(doc, projects_list):
         title_run = title_para.add_run(_safe_text(project.get('title', '')))
         title_run.font.bold = True
 
-        # Optimized bullet allocation for projects based on 1-page constraint
+        # Intelligent bullet allocation for projects
         project_index = projects_list.index(project)
-        total_projects = len(projects_list)
-
-        # Dynamic project bullet allocation
-        if total_projects == 1:
-            bullet_limit = 3  # Single project can have more detail
-        elif total_projects == 2:
-            bullet_limit = 2  # Two projects get moderate detail
-        else:
-            bullet_limit = 1  # 3+ projects need to be very compact
+        if len(projects_list) == 1:  # Single project - can afford more bullets
+            bullet_limit = 3
+        else:  # Multiple projects - limit bullets per project
+            bullet_limit = 2
 
         for bullet in project.get('bullets', [])[:bullet_limit]:
             bullet_para = doc.add_paragraph()
             bullet_para.add_run(f"• {_safe_text(bullet)}")
-            bullet_para.paragraph_format.space_after = Pt(1)
+            bullet_para.paragraph_format.space_after = Pt(1)  # Reduced spacing
             bullet_para.paragraph_format.left_indent = Inches(0.25)
 
-        # Minimal space between projects for 1-page compliance
-        if project_index < len(projects_list) - 1:  # Don't add space after last project
-            doc.add_paragraph().paragraph_format.space_after = Pt(2)
+        # Space between projects
+        doc.add_paragraph().paragraph_format.space_after = Pt(2)  # Reduced from 6pt
 
 
 def _add_certificates_section_docx(doc, certificates_list):
     """Add certificates section to DOCX"""
-    # Section title - Calibri 10pt as per requirements
+    # Section title
     title_para = doc.add_paragraph()
     title_run = title_para.add_run("CERTIFICATES")
-    title_run.font.name = 'Calibri'
     title_run.font.bold = True
-    title_run.font.size = Pt(10)  # Size 10 for headers as specified
-    title_para.paragraph_format.space_before = Pt(6)
+    title_run.font.size = Pt(11)  # Reduced from 13pt
+    title_para.paragraph_format.space_before = Pt(6)  # Reduced from 12pt
 
     # Divider
     divider_para = doc.add_paragraph()
     divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(3)
+    divider_para.paragraph_format.space_after = Pt(3)  # Reduced from 6pt
 
-    # Certificate entries - compact format with limited count for 1-page compliance
-    max_certs = min(len(certificates_list), 6)  # Limit certificates to maintain 1-page
-    for cert in certificates_list[:max_certs]:
+    # Certificate entries - show all but in compact format
+    for cert in certificates_list:
         cert_para = doc.add_paragraph()
         cert_text = _safe_text(cert) if isinstance(cert, str) else _safe_text(cert.get('name', ''))
-        cert_para.add_run(f"• {cert_text}")
-        cert_para.paragraph_format.space_after = Pt(0.5)  # Very compact
-        cert_para.paragraph_format.left_indent = Inches(0.25)
+        cert_para.add_run(f"• {cert_text}")  # Add bullet for consistency
+        cert_para.paragraph_format.space_after = Pt(1)  # Reduced from 3pt
 
 
 def _add_skills_section_docx(doc, skills_dict):
     """Add skills section to DOCX"""
-    # Section title - Calibri 10pt as per requirements
+    # Section title
     title_para = doc.add_paragraph()
     title_run = title_para.add_run("SKILLS")
-    title_run.font.name = 'Calibri'
     title_run.font.bold = True
-    title_run.font.size = Pt(10)  # Size 10 for headers as specified
-    title_para.paragraph_format.space_before = Pt(6)
+    title_run.font.size = Pt(11)  # Reduced from 13pt
+    title_para.paragraph_format.space_before = Pt(6)  # Reduced from 12pt
 
     # Divider
     divider_para = doc.add_paragraph()
     divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(3)
+    divider_para.paragraph_format.space_after = Pt(3)  # Reduced from 6pt
 
-    # Skill categories - format like reference resume
+    # Skill categories with Harvard formatting (parentheses)
     categories = {
         'Programming & Tools': 'Programming & Tools',
-        'ML & AI': 'Machine Learning & AI',
-        'Analytics': 'Data Analytics & Reporting'
+        'ML & AI': 'ML & AI',
+        'Analytics': 'Analytics'
     }
 
     for key, title in categories.items():
         if skills_dict.get(key):
-            # Category title (bold) with skills in same line
-            skills_para = doc.add_paragraph()
-            title_run = skills_para.add_run(f"{title} ")
-            title_run.font.bold = True
+            # Category title (bold)
+            cat_para = doc.add_paragraph()
+            cat_run = cat_para.add_run(f"{title}:")
+            cat_run.font.bold = True
+            cat_para.paragraph_format.space_after = Pt(0)
 
-            # Skills in comma-separated format (not parentheses)
-            skills_text = ', '.join([_safe_text(skill) for skill in skills_dict[key]])
-            skills_para.add_run(f"({skills_text})")
-            skills_para.paragraph_format.space_after = Pt(3)
+            # Skills in parentheses format
+            skills_para = doc.add_paragraph()
+            skills_text = ' '.join([f"({_safe_text(skill)})" for skill in skills_dict[key]])
+            skills_para.add_run(skills_text)
+            skills_para.paragraph_format.space_after = Pt(2)  # Reduced from 6pt
 
 
 def _add_languages_section_docx(doc, languages_list):
@@ -418,24 +364,23 @@ def _add_languages_section_docx(doc, languages_list):
     if not languages_list:
         return
 
-    # Section title - Calibri 10pt as per requirements
+    # Section title
     title_para = doc.add_paragraph()
     title_run = title_para.add_run("LANGUAGES")
-    title_run.font.name = 'Calibri'
     title_run.font.bold = True
-    title_run.font.size = Pt(10)  # Size 10 for headers as specified
-    title_para.paragraph_format.space_before = Pt(6)
+    title_run.font.size = Pt(11)  # Reduced from 13pt
+    title_para.paragraph_format.space_before = Pt(6)  # Reduced from 12pt
 
     # Divider
     divider_para = doc.add_paragraph()
     divider_run = divider_para.add_run("_" * 87)
-    divider_para.paragraph_format.space_after = Pt(3)
+    divider_para.paragraph_format.space_after = Pt(3)  # Reduced from 6pt
 
     # Languages
     lang_para = doc.add_paragraph()
     safe_languages = [_safe_text(lang) for lang in languages_list]
     lang_para.add_run(', '.join(safe_languages))
-    lang_para.paragraph_format.space_after = Pt(3)
+    lang_para.paragraph_format.space_after = Pt(2)  # Reduced from 6pt
 
 
 __all__ = ["render_harvard"]
