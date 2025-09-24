@@ -47,10 +47,10 @@ class InterviewQuestionsRequest(BaseModel):
     company_name: str = ""
     position_title: str = ""
 
+from backend.parser import extract_text, fallback_extract
 
 @app.post("/parse")
 async def parse_resume_api(file: UploadFile = File(...)):
-    # Save uploaded file temporarily
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         contents = await file.read()
         tmp.write(contents)
@@ -59,9 +59,11 @@ async def parse_resume_api(file: UploadFile = File(...)):
     try:
         raw_text = extract_text(tmp_path)
         parsed = llm_parse_resume(raw_text)
+        parsed = fallback_extract(raw_text, parsed)   # ✅ ensure no empty edu/exp
         return JSONResponse(content=parsed)
     finally:
         os.unlink(tmp_path)
+
 
 @app.post("/rewrite")
 async def rewrite_endpoint(body: RewriteRequest):

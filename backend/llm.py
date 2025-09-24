@@ -1,8 +1,50 @@
 import os
 from typing import Dict, Any, List
 import json
-
+from dotenv import load_dotenv
 import google.generativeai as genai
+import os
+from openai import OpenAI
+load_dotenv()
+class OpenAIAdapter:
+    """
+    Wraps OpenAI client so it behaves like Gemini's GenerativeModel:
+    - has .generate_content(prompt)
+    - returns an object with .text
+    """
+
+    def __init__(self, api_key: str, model_name: str = "gpt-4o-mini"):
+        self.client = OpenAI(api_key=api_key)
+        self.model_name = model_name
+
+    def generate_content(self, prompt: str):
+        resp = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=2000
+        )
+
+        class Result:
+            def __init__(self, text):
+                self.text = text
+
+        return Result(resp.choices[0].message.content)
+
+
+def _get_model():
+    """
+    Returns an OpenAIAdapter that looks like Gemini's GenerativeModel.
+    No other code needs to change.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        # ⚠️ fallback key only for local dev, never commit to repo
+        api_key = "sk-your-test-key"
+
+    return OpenAIAdapter(api_key=api_key, model_name="gpt-4o-mini")
 
 
 PROMPT_TEMPLATE = (
@@ -83,15 +125,15 @@ Output format: Numbered list of questions (no JSON)
 """
 ).strip()
 
-
+'''
 def _get_model() -> Any:
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         # Fallback to a hardcoded key for testing
-        api_key = "AIzaSyDGAHIO-v1Nhoae9JZQpc4J6oPaVOWeHT8"
+        api_key = "AIzaSyBApwUQwyC8fdB59houV5Ofx5yNQSgUX_M"
     genai.configure(api_key=api_key)
     return genai.GenerativeModel("gemini-1.5-flash")
-
+'''
 
 def rewrite_resume(resume_json: Dict[str, Any], job_description: str) -> Dict[str, Any]:
     """
@@ -417,20 +459,13 @@ Return JSON strictly in this schema:
   "contact_info": {{"full_name": "", "email": "", "phone": "", "location": ""}},
   "links": {{"LinkedIn": "", "GitHub": "", "HuggingFace": "", "Coursera": ""}},
   "summary": "",
-  "education": [
-    {{"institution":"", "degree":"", "field":"", "location":"", "graduation_date":"", "gpa":""}}
-  ],
-  "experience": [
-    {{"company":"", "position":"", "location":"", "start_date":"", "end_date":"", "achievements":[]}}
-  ],
-  "projects": [
-    {{"title":"", "description":"", "technologies":[], "bullets":[]}}
-  ],
+  "education": [],
+  "experience": [],
+  "projects": [],
   "certifications": [],
-  "skills": {{"Technical":[], "Non-Technical":[]}},
+  "skills": {{"Technical": [], "Non-Technical": []}},
   "languages": []
 }}
-
 Rules:
 - Always include all fields, even if empty.
 - If information is missing, use "" or [] (never null).
