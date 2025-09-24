@@ -182,6 +182,28 @@ def _categorize_keywords(tokens: set) -> Tuple[List[str], List[str]]:
 
 
 def score_ats(resume_json: Dict[str, Any], job_description: str) -> Dict[str, Any]:
+    # Guard clause: check for empty or malformed resume JSON
+    if not resume_json or not isinstance(resume_json, dict):
+        return {
+            "ats_score": 0,
+            "keyword_matches": {"technical": [], "business": []},
+            "missing_keywords": [],
+            "recommendations": ["Resume JSON is empty or malformed"],
+            "score_breakdown": {"skills": 0, "keywords": 0, "title": 0, "experience": 0}
+        }
+
+    resume_text = _flatten_resume(resume_json)
+
+    # Check if resume has meaningful content
+    if not resume_text.strip() or len(resume_text.strip()) < 20:
+        return {
+            "ats_score": 0,
+            "keyword_matches": {"technical": [], "business": []},
+            "missing_keywords": [],
+            "recommendations": ["Empty or insufficient resume content"],
+            "score_breakdown": {"skills": 0, "keywords": 0, "title": 0, "experience": 0}
+        }
+
     # Enhanced weights per spec
     weights = {
         "skills": 0.40,
@@ -190,7 +212,6 @@ def score_ats(resume_json: Dict[str, Any], job_description: str) -> Dict[str, An
         "experience": 0.10,
     }
 
-    resume_text = _flatten_resume(resume_json)
     resume_tokens = set(_tokenize(resume_text))
     jd_tokens = set(_tokenize(job_description))
 

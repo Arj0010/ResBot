@@ -1,5 +1,4 @@
 import json
-from pydoc import doc
 import re
 import os
 from typing import Dict, Any, List
@@ -12,6 +11,7 @@ from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 
+
 def _ensure_url(url: str) -> str:
     if not url:
         return url
@@ -21,6 +21,7 @@ def _ensure_url(url: str) -> str:
     if u.startswith("www."):
         return "https://" + u
     return "https://" + u
+
 
 def _add_hyperlink(paragraph, url, text):
     """Add a clickable hyperlink to a paragraph."""
@@ -45,6 +46,7 @@ def _add_hyperlink(paragraph, url, text):
     paragraph._element.append(hyperlink)
     return hyperlink
 
+
 def _add_divider(doc):
     p = doc.add_paragraph()
     p_par = p._element
@@ -58,6 +60,13 @@ def _add_divider(doc):
     p_borders.append(bottom)
     pPr.append(p_borders)
     return p
+
+
+def _add_section_title(doc, title: str):
+    p = doc.add_paragraph()
+    run = p.add_run(title.upper())
+    run.bold = True
+    p.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
 
 
 def _safe_text(text: str) -> str:
@@ -85,7 +94,6 @@ def _safe_add_paragraph(doc, text: str):
     return doc.add_paragraph("")
 
 
-
 def render_harvard(resume_json, output_path: str, job_title: str = ""):
     doc = Document()
 
@@ -99,6 +107,7 @@ def render_harvard(resume_json, output_path: str, job_title: str = ""):
             pstyle.paragraph_format.space_after = Pt(2)
         except Exception:
             pass
+
     # --- Header: centered name + contact info ---
     name = resume_json.get("contact_info", {}).get("full_name", "")
     if name:
@@ -112,7 +121,7 @@ def render_harvard(resume_json, output_path: str, job_title: str = ""):
     ci = resume_json.get("contact_info", {})
     links = resume_json.get("links", {}) or {}
 
-    # Build contact line (exclude Coursera)
+    # Build contact line (exclude Coursera from header)
     cp = doc.add_paragraph()
     cp.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
     contact_items = []
@@ -121,53 +130,19 @@ def render_harvard(resume_json, output_path: str, job_title: str = ""):
     if ci.get("email"): contact_items.append(ci["email"])
     if ci.get("phone"): contact_items.append(ci["phone"])
 
+    # Add professional links to header (exclude Coursera)
+    first = True
+    if contact_items:
+        cp.add_run(" • ".join(contact_items))
+        first = False
+
     for label in ["LinkedIn", "GitHub", "HuggingFace"]:
         url = links.get(label)
         if url:
-            if contact_items: cp.add_run(" • ")
+            if not first:
+                cp.add_run(" • ")
             _add_hyperlink(cp, url, label)
-
-    if contact_items:
-        cp.add_run(" • ".join(contact_items))
-
-    cp.paragraph_format.space_after = Pt(6)
-
-    # Ordered preferred links
-    preferred = ["LinkedIn", "GitHub", "HuggingFace"]
-    link_items = []
-    for key in preferred:
-        val = links.get(key)
-        if not val:
-            continue
-        # If value is a list (e.g., Coursera certificates)
-        if isinstance(val, list):
-            for idx, v in enumerate(val, 1):
-                link_items.append((f"{key} {idx}", v))
-        else:
-            link_items.append((key, val))
-
-    # any other links (catch-all)
-    for k, v in links.items():
-        if k not in preferred and v:
-            if isinstance(v, list):
-                for idx, v2 in enumerate(v, 1):
-                    link_items.append((f"{k} {idx}", v2))
-            else:
-                link_items.append((k, v))
-
-    # Write items to paragraph
-    first = True
-    for t in parts:
-        if not first:
-            cp.add_run(" • ")
-        cp.add_run(t[1] if isinstance(t, tuple) else t)
-        first = False
-
-    for idx, (label, url) in enumerate(link_items):
-        if not first:
-            cp.add_run(" • ")
-        _add_hyperlink(cp, url, label)
-        first = False
+            first = False
 
     cp.paragraph_format.space_after = Pt(6)
     _add_divider(doc)
@@ -243,9 +218,8 @@ def render_harvard(resume_json, output_path: str, job_title: str = ""):
             right_para.alignment = WD_PARAGRAPH_ALIGNMENT.RIGHT
             right_para.add_run(date_text)
 
-        # small space after section
         doc.add_paragraph()
-
+        _add_divider(doc)
 
     # === Projects ===
     if resume_json.get("projects"):
@@ -260,10 +234,11 @@ def render_harvard(resume_json, output_path: str, job_title: str = ""):
             for b in proj.get("bullets", []):
                 doc.add_paragraph(f"• {b}")
         _add_divider(doc)
-    # === Certifications ===
+
+    # === Certifications (including Coursera from links) ===
     certs = resume_json.get("certifications", []) or []
 
-    # Add Coursera links from links dict
+    # Add Coursera links from links dict to certifications section
     coursera_links = resume_json.get("links", {}).get("Coursera", [])
     if coursera_links:
         if isinstance(coursera_links, str):
@@ -275,14 +250,13 @@ def render_harvard(resume_json, output_path: str, job_title: str = ""):
         for c in certs:
             doc.add_paragraph(str(c))
         doc.add_paragraph()
+        _add_divider(doc)
 
-
-    # === Skills & Interests ===
+    # === Skills & Languages ===
     skills = resume_json.get("skills", {})
     langs = resume_json.get("languages", [])
-    certs = resume_json.get("certifications", [])
 
-    if skills or langs or certs:
+    if skills or langs:
         _add_section_title(doc, "SKILLS & INTERESTS")
 
         if skills:
@@ -292,18 +266,8 @@ def render_harvard(resume_json, output_path: str, job_title: str = ""):
         if langs:
             doc.add_paragraph("Languages: " + ", ".join(langs))
 
-        if certs:
-            doc.add_paragraph("Certifications: " + ", ".join(certs))
-
     # Save DOCX
     doc.save(output_path)
 
-def _add_section_title(doc, title: str):
-    p = doc.add_paragraph()
-    run = p.add_run(title.upper())
-    run.bold = True
-    p.alignment = WD_PARAGRAPH_ALIGNMENT.LEFT
 
 __all__ = ["render_harvard"]
-
-

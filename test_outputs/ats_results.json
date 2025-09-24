@@ -1,0 +1,39 @@
+{
+  "ats_score": 0,
+  "keyword_matches": {
+    "technical": [],
+    "business": [
+      "in"
+    ]
+  },
+  "missing_keywords": [
+    "react",
+    "python",
+    "postgresql",
+    "nice",
+    "azure",
+    "design",
+    "mysql",
+    "functional",
+    "pipelines",
+    "structures",
+    "django",
+    "are",
+    "of",
+    "write",
+    "architecture"
+  ],
+  "recommendations": [
+    "Add more technical skills relevant to the job description",
+    "Include more keywords from the job description in your experience bullets",
+    "Consider adjusting your job titles to better match the target role",
+    "Highlight your years of experience and specific project durations",
+    "Emphasize relevant projects, internships, or coursework to strengthen experience"
+  ],
+  "score_breakdown": {
+    "skills": 0,
+    "keywords": 1,
+    "title": 0,
+    "experience": 0
+  }
+}
